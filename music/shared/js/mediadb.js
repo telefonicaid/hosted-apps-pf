@@ -1504,7 +1504,9 @@ var MediaDB = (function() {
         var file = cursor.result;
         console.info(file);
         if (file) {
+          console.info(ignore(media, file));
           if (!ignore(media, file)) {
+            console.info('!ignore');
             insertRecord(media, file);
           }
           cursor.continue();
