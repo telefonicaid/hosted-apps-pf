@@ -1497,16 +1497,12 @@ var MediaDB = (function() {
       }
 
       cursor.onsuccess = function() {
-        console.info('here');
         if (!media.scanning) { // Abort if scanning has been cancelled
           return;
         }
         var file = cursor.result;
-        console.info(file);
         if (file) {
-          console.info(ignore(media, file));
           if (!ignore(media, file)) {
-            console.info('!ignore');
             insertRecord(media, file);
           }
           cursor.continue();
@@ -1515,9 +1511,7 @@ var MediaDB = (function() {
           // Quick scan is done. When the queue is empty, force out
           // any batched created events and move on to the slower
           // more thorough full scan.
-          console.info('quick scan done');
           whenDoneProcessing(media, function() {
-            console.info(media);
             sendNotifications(media);
             if (media.details.firstscan) {
               // If this was the first scan, then we're done
@@ -1758,7 +1752,6 @@ var MediaDB = (function() {
 
   function whenDoneProcessing(media, f) {
     var details = media.details;
-    console.info(media);
     if (details.processingQueue) {
       details.whenDoneProcessing.push(f);
     } else {
@@ -1778,7 +1771,6 @@ var MediaDB = (function() {
     // Deletions are always processed before insertions because we want
     // to clear away non-functional parts of the UI ASAP.
     function next() {
-      console.info('next');
       if (details.pendingDeletions.length > 0) {
         deleteFiles();
       }
@@ -1832,7 +1824,6 @@ var MediaDB = (function() {
       // is complete.  We use it to trigger a scanend event
       // after all the change events from the scan are delivered
       if (f === null) {
-      console.info('f null');
         sendNotifications(media);
         endscan(media);
         next();
@@ -1841,7 +1832,6 @@ var MediaDB = (function() {
 
       // If we got a filename, look up the file in device storage
       if (typeof f === 'string') {
-        console.info('f string');
         // Note: Even though we're using the default storage area, if the
         //       filename is fully qualified, it will get redirected to the
         //       appropriate storage area.
@@ -1868,7 +1858,6 @@ var MediaDB = (function() {
       }
       else {
         // otherwise f is the file we want
-        console.info('parseMetadata')
         parseMetadata(f, f.name, oldMetadata);
       }
     }
@@ -1893,14 +1882,13 @@ var MediaDB = (function() {
       if (fileinfo.date > details.newestFileModTime) {
         details.newestFileModTime = fileinfo.date;
       }
-console.info('here');
+
       // Get metadata about the file
       media.metadataParser(file, gotMetadata, metadataError, parsingBigFile);
       function parsingBigFile() {
         media.parsingBigFiles = true;
       }
       function metadataError(e) {
-        console.info(e);
         console.warn('MediaDB: error parsing metadata for',
                      filename, ':', e);
         // If we get an error parsing the metadata, assume it is invalid
@@ -1955,7 +1943,6 @@ console.info('here');
           next();
         };
         request.onerror = function(event) {
-          console.info(event);
           // If the error name is 'ConstraintError' it means that the
           // file already exists in the database. So try again, using put()
           // instead of add(). If that succeeds, then queue a delete
