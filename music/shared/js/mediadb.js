@@ -1515,6 +1515,7 @@ var MediaDB = (function() {
           // Quick scan is done. When the queue is empty, force out
           // any batched created events and move on to the slower
           // more thorough full scan.
+          console.info('quick scan done');
           whenDoneProcessing(media, function() {
             console.info(media);
             sendNotifications(media);
