@@ -1832,6 +1832,7 @@ var MediaDB = (function() {
       // is complete.  We use it to trigger a scanend event
       // after all the change events from the scan are delivered
       if (f === null) {
+      console.info('f null');
         sendNotifications(media);
         endscan(media);
         next();
@@ -1840,6 +1841,7 @@ var MediaDB = (function() {
 
       // If we got a filename, look up the file in device storage
       if (typeof f === 'string') {
+        console.info('f string');
         // Note: Even though we're using the default storage area, if the
         //       filename is fully qualified, it will get redirected to the
         //       appropriate storage area.
@@ -1866,6 +1868,7 @@ var MediaDB = (function() {
       }
       else {
         // otherwise f is the file we want
+        console.info('parseMetadata')
         parseMetadata(f, f.name, oldMetadata);
       }
     }
