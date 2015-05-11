@@ -167,6 +167,7 @@ function initDB() {
   // And hide the throbber when scanning is done
   musicdb.onscanend = function() {
     scanning = false;
+    console.info('scanend');
     if (displayingScanProgress) {
       scanProgress.classList.add('hidden');
       displayingScanProgress = false;

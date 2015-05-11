@@ -1777,6 +1777,7 @@ var MediaDB = (function() {
     // Deletions are always processed before insertions because we want
     // to clear away non-functional parts of the UI ASAP.
     function next() {
+      console.info('next');
       if (details.pendingDeletions.length > 0) {
         deleteFiles();
       }
