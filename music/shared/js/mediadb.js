@@ -1512,6 +1512,7 @@ var MediaDB = (function() {
           // any batched created events and move on to the slower
           // more thorough full scan.
           whenDoneProcessing(media, function() {
+            console.info(media);
             sendNotifications(media);
             if (media.details.firstscan) {
               // If this was the first scan, then we're done
