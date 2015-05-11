@@ -1501,6 +1501,7 @@ var MediaDB = (function() {
           return;
         }
         var file = cursor.result;
+        console.info(file);
         if (file) {
           if (!ignore(media, file)) {
             insertRecord(media, file);
