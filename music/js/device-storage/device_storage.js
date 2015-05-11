@@ -274,6 +274,7 @@
             self._fireError(JSON.parse(answer.error));
           } else {
             _files = answer.result;
+            console.info(_files);
             self.continue();
           }
         }

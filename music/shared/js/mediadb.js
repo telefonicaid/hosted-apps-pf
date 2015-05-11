@@ -1497,6 +1497,7 @@ var MediaDB = (function() {
       }
 
       cursor.onsuccess = function() {
+        console.info('here');
         if (!media.scanning) { // Abort if scanning has been cancelled
           return;
         }
