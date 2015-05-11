@@ -1755,6 +1755,7 @@ var MediaDB = (function() {
 
   function whenDoneProcessing(media, f) {
     var details = media.details;
+    console.info(media);
     if (details.processingQueue) {
       details.whenDoneProcessing.push(f);
     } else {
