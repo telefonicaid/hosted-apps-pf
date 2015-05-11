@@ -91,7 +91,7 @@ var AlbumArtCache = (function() {
       metadata.title : metadata.album + metadata.artist;
     var hashedNumber = (Math.abs(hash(infoForHash)) % 10) + 1;
 
-    return 'hosted-apps-pf/music/style/images/AlbumArt' + hashedNumber + '_small.png';
+    return '/hosted-apps-pf/music/style/images/AlbumArt' + hashedNumber + '_small.png';
   }
 
   /**
