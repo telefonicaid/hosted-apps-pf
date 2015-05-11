@@ -1893,13 +1893,14 @@ var MediaDB = (function() {
       if (fileinfo.date > details.newestFileModTime) {
         details.newestFileModTime = fileinfo.date;
       }
-
+console.info('here');
       // Get metadata about the file
       media.metadataParser(file, gotMetadata, metadataError, parsingBigFile);
       function parsingBigFile() {
         media.parsingBigFiles = true;
       }
       function metadataError(e) {
+        console.info(e);
         console.warn('MediaDB: error parsing metadata for',
                      filename, ':', e);
         // If we get an error parsing the metadata, assume it is invalid
@@ -1954,6 +1955,7 @@ var MediaDB = (function() {
           next();
         };
         request.onerror = function(event) {
+          console.info(event);
           // If the error name is 'ConstraintError' it means that the
           // file already exists in the database. So try again, using put()
           // instead of add(). If that succeeds, then queue a delete

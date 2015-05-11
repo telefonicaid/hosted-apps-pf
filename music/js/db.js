@@ -41,7 +41,7 @@ function initDB() {
 
   function metadataParserWrapper(file, onsuccess, onerror) {
     LazyLoader.load(
-      ['/js/metadata_scripts.js', '/js/metadata/album_art.js'],
+      ['js/metadata_scripts.js', 'js/metadata/album_art.js'],
       function() {
         AudioMetadata.parse(file).then(function(metadata) {
           return AlbumArt.process(file, metadata);
