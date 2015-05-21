@@ -195,7 +195,8 @@ console.log('processAnswer --> answer:' + JSON.stringify(answer));
         _cursor++;
         _done = _cursor > _serializedData.length ? true : false;
         this.onsuccess &&
-          typeof this.onsuccess === 'function' && this.onsuccess();
+          typeof this.onsuccess === 'function' &&
+          this.onsuccess({target: this});
       }
     };
 
