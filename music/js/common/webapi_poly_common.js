@@ -1,5 +1,7 @@
 (function(window) {
 
+  'use strict';
+
   // Helper for the common tasks for navigator.connect. This is not strictly
   // needed, but helps to do the things always the same way. That way being:
   // * The client app creates one (or as many as it needs) NavConnectHelper
@@ -19,7 +21,7 @@
   function NavConnectHelper(serviceURL) {
 
     function debug(text) {
-      console.log('MANU *-*-* NavConnectHelper: ' + text);
+      console.log('*-*-* NavConnectHelper: ' + text);
     }
 
     return new Promise((resolve, reject) => {
@@ -91,7 +93,9 @@
         data: extraData,
         processAnswer: function(answer) {
           if (answer.error) {
-            self._fireError(JSON.parse(answer.error));
+            self._fireError((typeof answer.error === 'object') ?
+                             answer.error :
+                             JSON.parse(answer.error));
           } else {
             self._fireSuccess(answer.result);
           }
@@ -104,15 +108,20 @@
     };
 
     Object.defineProperty(this, 'result', {
-      configurable: true,
       get: function() {
         return _result;
+      },
+      set: function(v) {
+        _result = v;
       }
     });
 
     Object.defineProperty(this, 'error', {
       get: function() {
         return _error;
+      },
+      set: function(e) {
+        _error = e;
       }
     });
 
@@ -137,7 +146,70 @@
     };
   }
 
+  // Implements something like
+  // http://mxr.mozilla.org/mozilla-central/source/dom/base/nsIDOMDOMCursor.idl
+  // FIX-ME: Note that this implementation expects the remote side to serialize
+  // all the cursor content to send it back on one single answer. This is
+  // suboptimal if the cursor holds a lot of data (like for SMS...).
+  function FakeDOMCursorRequest(reqId, extraData) {
+    FakeDOMRequest.call(this, reqId, extraData);
+    var _done = false;
+    var _serializedData = null;
+    var _cursor = 0;
+
+    var self = this;
+    this.serialize = function() {
+      return {
+        id: reqId,
+        data: extraData,
+        processAnswer: function(answer) {
+console.log('processAnswer --> answer:' + JSON.stringify(answer));
+          if (answer.error) {
+            self._fireError(answer.error);
+          } else {
+            _serializedData = answer.result;
+            self.continue();
+          }
+        }
+      };
+    };
+
+    this.then = undefined;
+
+    Object.defineProperty(this, 'done', {
+      get: function() {
+        return _done;
+      }
+    });
+
+    this.continue = function() {
+      if (!_done) {
+        this.result = _serializedData[_cursor];
+        this._fireSuccess();
+      }
+    };
+
+    // To-do: We should not need to rewrite this
+    this._fireSuccess = function() {
+      if (!_done) {
+        _cursor++;
+        _done = _cursor > _serializedData.length ? true : false;
+        this.onsuccess &&
+          typeof this.onsuccess === 'function' && this.onsuccess();
+      }
+    };
+
+    this._fireError = function(aError) {
+      if (!_done) {
+        this.error = aError;
+        this.onerror
+          && typeof this.onerror === 'function' && this.onerror(aError);
+      }
+    };
+  }
+
   window.NavConnectHelper = NavConnectHelper;
   window.FakeDOMRequest = FakeDOMRequest;
+  window.FakeDOMCursorRequest = FakeDOMCursorRequest;
 
 })(window);
