@@ -78,7 +78,7 @@ js/open.js
 js/playlist.js
 js/utils.js
 js/common/webapi_poly_common.js
-js/device-storage/device_storage.js
+js/devicestorage/devicestorage.js
 js/metadata/album_art.js
 js/metadata/album_art_cache.js
 js/metadata/core.js
