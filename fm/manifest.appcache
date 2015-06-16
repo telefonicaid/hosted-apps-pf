@@ -19,7 +19,7 @@ add2home/css/add2home.css
 add2home/js/add2home.js
 js/fm.js
 js/common/webapi_poly_common.js
-js/fm/fmradio.js
+js/fmradio/fmradio.js
 js/settings/settings.js
 shared/js/async_storage.js
 shared/js/cache.js

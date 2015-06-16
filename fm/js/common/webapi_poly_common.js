@@ -1,5 +1,8 @@
 (function(window) {
 
+  'use strict';
+
+
   // Helper for the common tasks for navigator.connect. This is not strictly
   // needed, but helps to do the things always the same way. That way being:
   // * The client app creates one (or as many as it needs) NavConnectHelper
@@ -22,7 +25,10 @@
       console.log('*-*-* NavConnectHelper: ' + text);
     }
 
-    return new Promise((resolve, reject) => {
+    // It actually makesmore sense having this here...
+    var _currentRequestId = 1;
+
+    var retValue = new Promise((resolve, reject) => {
       // navigator.connect port with the settings service, when the connection
       // is established.
       var _port = null;
@@ -67,6 +73,52 @@
         resolve(realHandler);
       }).catch(error => reject(error));
     });
+
+    retValue.createAndQueueRequest = function(data, constructor) {
+      return this.queueDependentRequest(data, constructor);
+    };
+
+    // Sent a request that depends on another promise (for things that
+    // require a previous object, like setttings locks or sockets).
+    // Basically, waits till 'promise' is fulfilled, set the result as the
+    // 'field' field of 'data', and calls sendObject with that object.
+    retValue.queueDependentRequest = function(data, constructor, promise,
+                                              field) {
+      var request = new constructor(++_currentRequestId, data);
+      Promise.all([this, promise]).then(([navConn, promValue]) => {
+        if (field && promValue) {
+          data[field] = promValue;
+        }
+        navConn.sendObject(request);
+      });
+      return request;
+    };
+
+    retValue.methodCall = function(options) {
+      var methodName = options.methodName;
+      var numParams = options.numParams;
+      var returnValue = options.returnValue;
+      var extraData = options.extraData || {};
+      var params = [];
+      // It's not recommended calling splice on arguments apparently.
+      // Also, first three arguments are explicit
+      for(var i = 1; i < numParams + 1; i++) {
+        params.push(arguments[i]);
+      }
+      var data = {
+        operation: methodName,
+        params: params
+      };
+
+      for (var key in extraData) {
+        data[key] = extraData[key];
+      }
+
+      return this.queueDependentRequest(data,
+        returnValue, options.promise, options.field);
+    };
+
+    return retValue;
   }
 
   // This should probably be on a common part...
@@ -91,7 +143,9 @@
         data: extraData,
         processAnswer: function(answer) {
           if (answer.error) {
-            self._fireError(answer.error);
+            self._fireError((typeof answer.error === 'object') ?
+                             answer.error :
+                             JSON.parse(answer.error));
           } else {
             self._fireSuccess(answer.result);
           }
@@ -106,12 +160,18 @@
     Object.defineProperty(this, 'result', {
       get: function() {
         return _result;
+      },
+      set: function(v) {
+        _result = v;
       }
     });
 
     Object.defineProperty(this, 'error', {
       get: function() {
         return _error;
+      },
+      set: function(e) {
+        _error = e;
       }
     });
 
@@ -121,7 +181,8 @@
         _fired = true;
         _resolve(result);
         this.onsuccess &&
-          typeof this.onsuccess === 'function' && this.onsuccess();
+          typeof this.onsuccess === 'function' &&
+          this.onsuccess({target: this});
       }
     };
 
@@ -136,7 +197,218 @@
     };
   }
 
+  // Implements something like
+  // http://mxr.mozilla.org/mozilla-central/source/dom/base/nsIDOMDOMCursor.idl
+  // FIX-ME: Note that this implementation expects the remote side to serialize
+  // all the cursor content to send it back on one single answer. This is
+  // suboptimal if the cursor holds a lot of data (like for SMS...).
+  function FakeDOMCursorRequest(reqId, extraData) {
+    FakeDOMRequest.call(this, reqId, extraData);
+    var _done = false;
+    var _serializedData = null;
+    var _cursor = 0;
+
+    var self = this;
+    this.serialize = function() {
+      return {
+        id: reqId,
+        data: extraData,
+        processAnswer: function(answer) {
+          if (answer.error) {
+            self._fireError(answer.error);
+          } else {
+            _serializedData = answer.result;
+            self.continue();
+          }
+        }
+      };
+    };
+
+    this.then = undefined;
+
+    Object.defineProperty(this, 'done', {
+      get: function() {
+        return _done;
+      }
+    });
+
+    this.continue = function() {
+      if (!_done) {
+        this.result = _serializedData[_cursor];
+        this._fireSuccess();
+      }
+    };
+
+    // To-do: We should not need to rewrite this
+    this._fireSuccess = function() {
+      if (!_done) {
+        _cursor++;
+        _done = _cursor > _serializedData.length ? true : false;
+        this.onsuccess &&
+          typeof this.onsuccess === 'function' &&
+          this.onsuccess({target: this});
+      }
+    };
+
+    this._fireError = function(aError) {
+      if (!_done) {
+        this.error = aError;
+        this.onerror
+          && typeof this.onerror === 'function' && this.onerror(aError);
+      }
+    };
+  }
+
+  function FakeEventTarget(navConnHelper, listenerCb, field, promise) {
+    // _listeners[type][ListenerId] => undefined or a callback function
+    var _listeners = {};
+    promise = promise || Promise.resolve(null);
+
+    // And this is something else that might be reusable...
+    function Listener(reqId, extraData) {
+      _listeners[extraData.type][reqId] = extraData.cb;
+      this.serialize = function() {
+        return {
+          id: reqId,
+          data: extraData,
+          processAnswer: answer => {
+            if (answer.event) {
+              if (typeof listenerCb === 'function') {
+                listenerCb(answer.event, _listeners[extraData.type][reqId]);
+              } else {
+                _listeners[extraData.type] &&
+                  typeof _listeners[extraData.type][reqId] === 'function' &&
+                  _listeners[extraData.type][reqId](answer.event);
+              }
+            }
+          }
+        };
+      };
+    }
+
+    function ListenerRemoval(reqId, extraData) {
+      this.serialize = function() {
+        return {
+          id: reqId,
+          data: extraData,
+          processAnswer: answer => debug('Got an invalid answer for: ' + reqId)
+        };
+      };
+    }
+
+    function Dispatcher(reqId, extraData) {
+      this.serialize = function() {
+        return {
+          id: reqId,
+          data: extraData,
+          processAnswer: answer => debug('Got an invalid answer for: ' + reqId)
+        };
+      };
+    }
+
+    this.addEventListener = function(type, cb, useCapture) {
+      if (!_listeners[type]) {
+        _listeners[type] = {};
+      }
+      promise.then(value => {
+        var data = {
+          operation: 'addEventListener',
+          type: type,
+          useCapture: useCapture,
+          cb: cb
+        };
+
+        data[field] = value;
+        navConnHelper.createAndQueueRequest(data, Listener);
+      });
+    };
+
+    this.removeEventListener = function(type, cb) {
+      var listeners = _listeners[type];
+      var listenerId = -1;
+      for (var key in listeners) {
+        if (listeners[key] === cb) {
+          listenerId = key;
+          break;
+        }
+      }
+
+      if (cbIndex === -1) {
+        return;
+      }
+
+      promise.then(value => {
+        var data = {
+          operation: 'removeEventListener',
+          type: type,
+          listenerId: listenerId
+        };
+
+        data[field] = value;
+        navConnHelper.createAndQueueRequest(data, ListenerRemoval);
+      });
+      delete _listeners[type][listenerId];
+    };
+
+    this.dispatchEvent = function(event) {
+      promise.then(value => {
+        var data = {
+          operation: 'dispatchEvent',
+          event: event
+        };
+
+        data[field] = value;
+        navConnHelper.createAndQueueRequest(data, Dispatcher);
+      });
+    };
+  }
+
+  function HandlerSetRequest(reqId, extraData) {
+    this.serialize = function() {
+      return {
+        id: reqId,
+        data: {
+          operation: extraData.handler,
+          socketId: extraData.socketId
+        },
+        processAnswer: answer => extraData.cb(answer.event)
+      };
+    };
+  }
+
+  function VoidRequest(reqId, extraData) {
+    function debug(text) {
+      console.log('*-*-* VoidRequest: ' + text);
+    }
+    this.serialize = function() {
+      return {
+        id: reqId,
+        data: extraData,
+        processAnswer: answer => debug('Got an invalid answer for: ' + reqId)
+      };
+    };
+  }
+
+  function OnChangeRequest(reqId, extraData) {
+    this.serialize = () => {
+      return {
+        id: reqId,
+        data: extraData,
+        processAnswer: answer => {
+          if (answer.event) {
+            extraData.callback(answer.event);
+          }
+        }
+      };
+    };
+  }
+
+  window.VoidRequest = VoidRequest;
+  window.OnChangeRequest = OnChangeRequest;
+  window.HandlerSetRequest = HandlerSetRequest;
   window.NavConnectHelper = NavConnectHelper;
   window.FakeDOMRequest = FakeDOMRequest;
+  window.FakeDOMCursorRequest = FakeDOMCursorRequest;
+  window.FakeEventTarget = FakeEventTarget;
 
 })(window);
